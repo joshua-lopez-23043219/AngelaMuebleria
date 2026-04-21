@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-primary: #1a1a1a;
+  --color-brand-accent: #c5a059; /* Gold accent */
+  --color-paper: #f9f7f2;
+}
+
+body {
+  @apply bg-paper text-brand-primary font-sans antialiased;
+}
+
+h1, h2, h3, .serif {
+  @apply font-serif;
+}
+
