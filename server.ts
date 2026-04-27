@@ -22,15 +22,23 @@ db.pragma('journal_mode = WAL');
 
 // Initialize Schema
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
+  DROP TABLE IF EXISTS order_items;
+  DROP TABLE IF EXISTS orders;
+  DROP TABLE IF EXISTS products;
+  DROP TABLE IF EXISTS users;
+
+  CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
+    phone TEXT,
+    department TEXT,
+    municipality TEXT,
     role TEXT DEFAULT 'client' CHECK(role IN ('client', 'admin'))
   );
 
-  CREATE TABLE IF NOT EXISTS products (
+  CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
@@ -40,7 +48,7 @@ db.exec(`
     image_url TEXT
   );
 
-  CREATE TABLE IF NOT EXISTS orders (
+  CREATE TABLE orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     total REAL NOT NULL,
@@ -49,7 +57,7 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
-  CREATE TABLE IF NOT EXISTS order_items (
+  CREATE TABLE order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,
     product_id INTEGER NOT NULL,
@@ -66,11 +74,14 @@ const seedAdmin = () => {
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
   if (!existing) {
     const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO users (name, email, password, role, phone, department, municipality) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
       'Administrador Principal',
       adminEmail,
       hashedPassword,
-      'admin'
+      'admin',
+      '88888888',
+      'Masaya',
+      'Masatepe'
     );
     console.log('Admin user seeded');
   }
@@ -127,13 +138,15 @@ async function startServer() {
 
   // Auth
   app.post('/api/auth/register', (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, phone, department, municipality } = req.body;
     try {
       const hashedPassword = bcrypt.hashSync(password, 10);
-      const result = db.prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?)').run(name, email, hashedPassword);
+      const result = db.prepare('INSERT INTO users (name, email, password, phone, department, municipality) VALUES (?, ?, ?, ?, ?, ?)').run(
+        name, email, hashedPassword, phone, department, municipality
+      );
       const userId = Number(result.lastInsertRowid);
       const token = jwt.sign({ id: userId, role: 'client' }, JWT_SECRET);
-      res.json({ token, user: { id: userId, name, email, role: 'client' } });
+      res.json({ token, user: { id: userId, name, email, role: 'client', phone, department, municipality } });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
@@ -147,7 +160,18 @@ async function startServer() {
         return res.status(401).json({ error: 'Credenciales inválidas' });
       }
       const token = jwt.sign({ id: Number(user.id), role: user.role }, JWT_SECRET);
-      res.json({ token, user: { id: Number(user.id), name: user.name, email: user.email, role: user.role } });
+      res.json({ 
+        token, 
+        user: { 
+          id: Number(user.id), 
+          name: user.name, 
+          email: user.email, 
+          role: user.role,
+          phone: user.phone,
+          department: user.department,
+          municipality: user.municipality
+        } 
+      });
     } catch (e: any) {
       res.status(500).json({ error: 'Error en el login: ' + e.message });
     }
@@ -238,7 +262,10 @@ async function startServer() {
           orders.status,
           orders.created_at,
           users.name as user_name,
-          users.email as user_email
+          users.email as user_email,
+          users.phone as user_phone,
+          users.department as user_department,
+          users.municipality as user_municipality
         FROM orders 
         LEFT JOIN users ON orders.user_id = users.id 
         ORDER BY orders.created_at DESC
